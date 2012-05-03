@@ -1,0 +1,403 @@
+<!doctype html>
+<html>
+<head>
+	<title>FotoFilter</title>
+	<link rel="stylesheet" type="text/css" href="app.css" />
+	<style>
+
+
+		@-moz-keyframes fadeIn {
+			0% { opacity: 0; },
+			100% { opacity: 1; }
+		}
+
+		@-moz-keyframes shootUp {
+			0% { opacity: 0; margin-top: 80px; },
+			100% { opacity: 1; margin-top: 0; }
+		}
+
+		@-moz-keyframes spin {
+			0% { -moz-transform: rotate(0deg); },
+			100% { -moz-transform: rotate(360deg); }
+		}
+
+		* { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+
+		body {
+			opacity: 0;
+		}
+
+		body.fadeIn {
+			opacity: 1;
+			animation-name: fadeIn;
+			animation-duration: 2s;
+			-moz-animation-name: fadeIn;
+			-moz-animation-duration: 2s;
+		}
+
+		h1 {
+			background: -moz-linear-gradient(#6FACD5, #497BAE);
+			text-align: center;
+			padding: 10px 20px;
+			color: #fff;
+			margin-bottom: 20px;
+			border-bottom: 1px solid #497BAE;
+			text-shadow: 0 1px 1px #3E6790;
+		}
+
+		#viewContainer {
+			margin: 0 auto;
+			overflow: hidden;
+		}
+
+		#viewScroller {
+			width: 90000px;
+		}
+
+			#viewContainer, #viewScroller > div {
+				width: 606px;
+			}
+
+			#viewScroller > div {
+				margin-left: 0;
+				overflow-x: hidden;
+				display:inline-block;
+				vertical-align: text-top;
+
+				-moz-transition-property: margin-left;
+				-moz-transition-duration: .5s;
+			}
+
+		#viewCameraCanvasImageHolder {
+			position: relative;
+			background: #ddd;
+		}
+
+			#viewCameraCanvasImageHolder:hover #viewCameraCanvasImageToolbar {
+				height: 40px;
+				-moz-transition-property: height;
+				-moz-transition-duration: .5s;
+			}
+
+		#viewCameraCanvasImageToolbar {
+			background: #000;
+			opacity: .7;
+			color: #fff;
+			height: 0;
+			position: absolute;
+			z-index: 20;
+			top: 0;
+			left: 0;
+			right: 0;
+			text-align:right;
+			overflow:hidden;
+
+			-moz-transition-property: height;
+			-moz-transition-duration: .5s;
+		}
+
+		#viewCameraCanvasImageToolbarRotate {
+			width: 16px;
+			height: 16px;
+			background: url(rotate.png) 0 0 no-repeat;
+			text-indent: -2000px;
+			overflow:hidden;
+			display: block;
+			float:right;
+			margin:10px 10px 0 0;
+			text-decoration: none;
+		}
+
+		canvas {
+			-moz-transform: rotate(0deg);
+			-moz-transition-property: -moz-transform;
+			-moz-transition-duration: 1s;
+		}
+
+		#viewCameraCanvasFilterList {
+			list-style: none;
+			margin-top: 20px;
+			text-align: center;
+			min-height: 90px;
+			margin-bottom: 10px;
+		}
+
+		#viewCameraCanvasFilterList li {
+			display: inline-block;
+			margin: 0 10px 0 0;
+			text-align: center;
+			padding: 5px;
+			border-radius: 10px;
+		}
+
+		#viewCameraCanvasFilterList li:hover {
+			background: -moz-linear-gradient(#eee, #efefef);
+		}
+
+		#viewCameraCanvasFilterList li.current {
+			background: -moz-linear-gradient(#6FACD5, #497BAE);
+			color: #fff;
+		}
+
+			#viewCameraCanvasFilterList li.current .filterBlock {
+				border: 1px solid #fff;
+			}
+
+		.filterItem {
+			cursor: pointer;
+			height: 80px;
+			overflow: hidden;
+		}
+			.filterBlock {
+				width: 48px;
+				height: 48px;
+				border-radius: 10px;
+				border: 1px solid #999;
+				display: inline-block;
+				margin-top: 80px;
+				opacity: 0;
+				-moz-transform: rotate(0deg);
+				overflow: hidden;
+			}
+
+			.filterBlock.shootUp {
+				animation-name: shootUp;
+				animation-duration: 1s;
+
+				-moz-animation-name: shootUp;
+				-moz-animation-duration: 1s;
+
+				opacity: 1;
+				margin-top: 0;
+			}
+
+			.filterName {
+				font-size: 12px;
+				font-weight: bold;
+				text-transform: uppercase;
+			}
+
+		#menu {
+			height: 60px;
+			background: -moz-linear-gradient(#3C3C3C, #111);
+		}
+
+		.nextButton {
+				display: block;
+				float:right;
+				text-align: center;
+				position: relative;
+				margin: 0 8px 8px 8px;
+				padding: 8px;
+				-moz-box-shadow: 0px 1px 4px rgba(0,0,0,.3);
+				-moz-background-clip: padding;
+				border-radius: 1em;
+				border: 1px solid #044062;
+				background-image: -moz-linear-gradient(#5F9CC5, #396B9E);
+				font-size: 12px;
+				color: #fff;
+				text-decoration:none;
+			}
+	</style>
+	<script src="app.js" type="text/javascript"></script>
+	<script src="filters/base.js" type="text/javascript"></script>
+	<script>
+
+		// On page load, go
+		window.addEventListener("load", function() {
+
+			function substitute(template, object) {
+				return template.replace(/\\?\{([^{}]+)\}/g, function(match, name){
+					if (match.charAt(0) == '\\') return match.slice(1);
+					return (object[name] != null) ? object[name] : '';
+				});
+			}
+
+			// Get hold of the sample image
+			var sampleImage = document.getElementById("sampleImage"),
+				canvas = document.getElementById("viewCameraCanvas"),
+				filterList = document.getElementById("viewCameraCanvasFilterList"),
+				iconImage = document.getElementById("iconImage"),
+				filterItemTemplate = '<div class="filterItem"><div class="filterBlock shootUp"></div><div class="filterName">{name}</div></div>';
+
+			// Canvasize the image - HACK :(
+			FOTOFILTER.image = iconImage;
+
+			// Create the list items
+			var frag = document.createDocumentFragment(), currentFilterNode;
+			for(filter in FOTOFILTER.filters) {
+
+				// Create the list item
+				var li = document.createElement("li");
+				li.setAttribute("data-filter", filter);
+				li.innerHTML = substitute(filterItemTemplate, {
+					name: FOTOFILTER.filters[filter].name,
+					filter: filter
+				});
+
+				//
+				var cv = document.createElement("canvas");
+				cv.setAttribute("width", "48");
+				cv.setAttribute("height", "48");
+				cv.getContext("2d").drawImage(iconImage, 0, 0);
+				FOTOFILTER.canvas = cv; // HACK :(
+
+				var filterObj = FOTOFILTER.filters[filter];
+				FOTOFILTER.applyFilter(filterObj.filter, iconImage, filterObj.options || {}, cv);
+				li.childNodes[0].childNodes[0].appendChild(cv);
+
+				// Append to fragment
+				frag.appendChild(li);
+			}
+			currentFilterNode = frag.childNodes[0];
+			currentFilterNode.className = "current";
+			setTimeout(function() { filterList.appendChild(frag); }, 1000);
+
+			// Canvasize the image
+			FOTOFILTER.image = sampleImage;
+			FOTOFILTER.canvas = canvas;
+			canvas.getContext("2d").drawImage(sampleImage, 0, 0);
+
+			// Implement filters upon click
+			filterList.addEventListener("click", function(e) {
+				var target = e.target,
+					filterObj;
+
+				// Ensure that they didn't somehow click the LI or UL
+				if(target.tagName != "LI") {
+					while(target.parentNode) {
+						target = target.parentNode;
+						if(target.tagName == "LI") break;
+					}
+				}
+
+				// Figure out their filter
+				filterObj = FOTOFILTER.filters[target.getAttribute("data-filter")];
+
+				// If that filter exists...which if f'n better...
+				if(!filterObj) return;
+
+				// Swap
+				currentFilterNode.className = "";
+				currentFilterNode = target;
+				currentFilterNode.className = "current";
+
+
+				FOTOFILTER.applyFilter(filterObj.filter, sampleImage, filterObj.options || {}, canvas);
+
+			}, false);
+
+			// Fade in!
+			document.body.className += "fadeIn";
+
+			// boo
+			var rotateNode = document.getElementById("viewCameraCanvasImageToolbarRotate"), curRotate = 0;
+			rotateNode.addEventListener("click", function() {
+				canvas.setAttribute("style", "-moz-transform: rotate(" + (curRotate+=90) + "deg)");
+			}, false);
+
+			// Next button 
+			var nextButton = document.getElementById("nextButton"),
+				prevButton = document.getElementById("prevButton"),
+				finishImage = document.getElementById("finishImage"),
+				firstPane = document.getElementById("viewCamera");
+			nextButton.addEventListener("click", function() {
+				firstPane.setAttribute("style", "margin-left:-606px");
+				nextButton.style.display = "none";
+				prevButton.style.display = "";
+
+				// Update the image
+				finishImage.src = canvas.toDataURL("image/png");
+
+
+			}, false);
+
+			// Previous button
+			prevButton.addEventListener("click", function() {
+				firstPane.setAttribute("style", "margin-left:0");
+				prevButton.style.display = "none";
+				nextButton.style.display = "";
+			}, false);
+
+		});
+
+
+	</script>
+</head>
+<body>
+	<!-- hardcode test image -->
+	<img src="sample-image-2.jpg" style="display:none;" id="sampleImage" />
+	<img src="mozilla-icon.png" style="display:none;" id="iconImage" />
+
+	<h1>
+		<a href="javascript:;" class="nextButton" id="prevButton" style="float:left; display:none;">&lt; Filter</a>
+
+		FotoFilter
+
+		<a href="javascript:;" class="nextButton" id="nextButton">Save &gt;</a>
+	</h1>
+
+	<!-- views container -->
+	<div id="viewContainer"><div id="viewScroller">
+
+		<!-- view that has the camera in it -->
+		<div id="viewCamera">
+
+			<!-- subview for live camera  -->
+			<div id="viewCameraLive">
+
+			</div>
+
+			<!-- subview for canvas photo + filter menu -->
+			<div id="viewCameraCanvasHolder">
+
+				<div id="viewCameraCanvasImageHolder">
+
+					<div id="viewCameraCanvasImageToolbar">
+						<a href="javascript:;" id="viewCameraCanvasImageToolbarRotate" title="Rotate">&nbsp;</a>
+					</div>
+
+					<canvas id="viewCameraCanvas" width="604" height="604" style="border:1px solid #999;"></canvas>
+				</div>
+
+				<ul id="viewCameraCanvasFilterList">
+					
+				</ul>
+
+
+			</div>
+
+		</div>
+
+
+		<!-- view: finisher -->
+		<div id="viewFinish">
+
+			<img id="finishImage" style="width:604px;height:604px;" />
+
+			<a href="javascript:;" class="nextButton" style="font-size:20px;float:none;display:block;width:200px;margin: 20px auto;">Send to Service</a>
+
+		</div>
+
+
+	</div></div>
+
+
+
+	<!-- bottom control menu -->
+	<div id="menu">
+		<div id="menuCamera" data-view-id="viewCamera"></div>
+	</div>
+
+
+
+
+	<!-- spinner for in progress actions -->
+	<div id="spinner"></div>
+
+	<!-- overlay, can be used by anything -->
+	<div id="overlay"></div>
+
+
+</body>
+</html>
